@@ -33,7 +33,6 @@ public protocol BarcodeScannerDismissalDelegate: class {
  */
 open class BarcodeScannerViewController: UIViewController {
   private static let footerHeight: CGFloat = 75
-  public var hideFooterView = false
 
   // MARK: - Public properties
 
@@ -48,10 +47,6 @@ open class BarcodeScannerViewController: UIViewController {
   /// and waits for the next reset action.
   public var isOneTimeSearch = true
 
-    /// When the flag is set to `true` the screen is flashed on barcode scan.
-      /// Defaults to true.
-  public var shouldSimulateFlash = true
-    
   /// `AVCaptureMetadataOutput` metadata object types.
   public var metadata = AVMetadataObject.ObjectType.barcodeScannerMetadata {
     didSet {
@@ -73,7 +68,7 @@ open class BarcodeScannerViewController: UIViewController {
   // Title label and close button.
   public private(set) lazy var headerViewController: HeaderViewController = .init()
   /// Information view with description label.
-  public private(set) lazy var messageViewController: MessageViewController = .init()
+  public lazy var messageViewController: MessageViewController? = .init()
   /// Camera view with custom buttons.
   public private(set) lazy var cameraViewController: CameraViewController = .init()
 
@@ -82,8 +77,8 @@ open class BarcodeScannerViewController: UIViewController {
   // Constraints that are activated when the view is used for loading animation and error messages.
   private lazy var expandedConstraints: [NSLayoutConstraint] = self.makeExpandedConstraints()
 
-  private var messageView: UIView {
-    return messageViewController.view
+  private var messageView: UIView? {
+    return messageViewController?.view
   }
 
   /// The current controller's status mode.
@@ -99,15 +94,19 @@ open class BarcodeScannerViewController: UIViewController {
     super.viewDidLoad()
     view.backgroundColor = UIColor.black
 
-    add(childViewController: messageViewController)
-    messageView.translatesAutoresizingMaskIntoConstraints = false
-    collapsedConstraints.activate()
+    if let messageViewController = self.messageViewController {
+        add(childViewController: messageViewController)
+        messageView?.translatesAutoresizingMaskIntoConstraints = false
+        collapsedConstraints.activate()
+    }
 
     cameraViewController.metadata = metadata
     cameraViewController.delegate = self
     add(childViewController: cameraViewController)
-
-    view.bringSubviewToFront(messageView)
+    
+    if let messageView = messageView {
+        view.bringSubviewToFront(messageView)
+    }
   }
 
   open override func viewWillAppear(_ animated: Bool) {
@@ -141,7 +140,7 @@ open class BarcodeScannerViewController: UIViewController {
 
   private func changeStatus(from oldValue: Status, to newValue: Status) {
     guard newValue.state != .notFound else {
-      messageViewController.status = newValue
+      messageViewController?.status = newValue
       DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 2.0) {
         self.status = Status(state: .scanning)
       }
@@ -166,7 +165,7 @@ open class BarcodeScannerViewController: UIViewController {
       expandedConstraints.activate()
     }
 
-    messageViewController.status = newValue
+    messageViewController?.status = newValue
 
     UIView.animate(
       withDuration: duration,
@@ -178,9 +177,9 @@ open class BarcodeScannerViewController: UIViewController {
           self?.resetState()
         }
 
-        self?.messageView.layer.removeAllAnimations()
+        self?.messageView?.layer.removeAllAnimations()
         if self?.status.state == .processing {
-          self?.messageViewController.animateLoading()
+          self?.messageViewController?.animateLoading()
         }
       }))
   }
@@ -202,13 +201,6 @@ open class BarcodeScannerViewController: UIViewController {
    - Parameter processing: Flag to set the current state to `.processing`.
    */
   private func animateFlash(whenProcessing: Bool = false) {
-    guard shouldSimulateFlash else {
-        if whenProcessing {
-            self.status = Status(state: .processing)
-        }
-        return
-    }
-
     let flashView = UIView(frame: view.bounds)
     flashView.backgroundColor = UIColor.white
     flashView.alpha = 1
@@ -247,7 +239,7 @@ private extension BarcodeScannerViewController {
       cameraView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       cameraView.bottomAnchor.constraint(
         equalTo: view.bottomAnchor,
-        constant: hideFooterView ? 0 : -BarcodeScannerViewController.footerHeight
+        constant: self.messageView?.bounds.size.height ?? 0
       )
     )
 
@@ -263,13 +255,16 @@ private extension BarcodeScannerViewController {
         headerView.topAnchor.constraint(equalTo: view.topAnchor),
         headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
         headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        headerView.bottomAnchor.constraint(equalTo: headerViewController.navigationBar.bottomAnchor),
         cameraView.topAnchor.constraint(equalTo: headerView.bottomAnchor)
       )
     }
   }
 
   private func makeExpandedConstraints() -> [NSLayoutConstraint] {
+    guard let messageView = self.messageView else {
+        return []
+    }
+    
     return [
       messageView.topAnchor.constraint(equalTo: view.topAnchor),
       messageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -279,12 +274,16 @@ private extension BarcodeScannerViewController {
   }
 
   private func makeCollapsedConstraints() -> [NSLayoutConstraint] {
+    guard let messageView = self.messageView else {
+        return []
+    }
+    
     return [
       messageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
       messageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       messageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       messageView.heightAnchor.constraint(
-        equalToConstant: hideFooterView ? 0 : -BarcodeScannerViewController.footerHeight
+        equalToConstant: BarcodeScannerViewController.footerHeight
       )
     ]
   }

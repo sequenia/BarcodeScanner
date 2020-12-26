@@ -7,9 +7,15 @@ import AVFoundation
  - Returns: An image.
  */
 func imageNamed(_ name: String) -> UIImage {
+  let cls = BarcodeScannerViewController.self
+  var bundle = Bundle(for: cls)
   let traitCollection = UITraitCollection(displayScale: 3)
 
-    guard let image = UIImage(named: name, in: Bundle.module, compatibleWith: traitCollection) else {
+  if let resourceBundle = bundle.resourcePath.flatMap({ Bundle(path: $0 + "/BarcodeScanner.bundle") }) {
+    bundle = resourceBundle
+  }
+
+  guard let image = UIImage(named: name, in: bundle, compatibleWith: traitCollection) else {
     return UIImage()
   }
 
@@ -22,7 +28,11 @@ func imageNamed(_ name: String) -> UIImage {
  - Returns: An image.
  */
 func localizedString(_ key: String) -> String {
-    NSLocalizedString(key, bundle: Bundle.module, comment: key)
+  if let path = Bundle(for: BarcodeScannerViewController.self).resourcePath,
+    let resourceBundle = Bundle(path: path + "/Localization.bundle") {
+    return resourceBundle.localizedString(forKey: key, value: nil, table: "Localizable")
+  }
+  return key
 }
 
 /// Checks if the app is running in Simulator.

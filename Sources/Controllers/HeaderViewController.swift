@@ -13,7 +13,7 @@ public final class HeaderViewController: UIViewController {
   // MARK: - UI properties
 
   /// Header view with title label and close button.
-  public private(set) lazy var navigationBar: UINavigationBar = self.makeNavigationBar()
+  public var navigationBar: UINavigationBar?
   /// Title view of the navigation bar.
   public private(set) lazy var titleLabel: UILabel = self.makeTitleLabel()
   /// Left bar button item of the navigation bar.
@@ -24,10 +24,10 @@ public final class HeaderViewController: UIViewController {
   public override func viewDidLoad() {
     super.viewDidLoad()
 
-    navigationBar.delegate = self
+    navigationBar?.delegate = self
     closeButton.addTarget(self, action: #selector(handleCloseButtonTap), for: .touchUpInside)
 
-    view.addSubview(navigationBar)
+    view.addSubview(navigationBar ?? UIView())
     setupConstraints()
   }
 
@@ -41,14 +41,14 @@ public final class HeaderViewController: UIViewController {
 
   private func setupConstraints() {
     NSLayoutConstraint.activate(
-      navigationBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      navigationBar.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+      navigationBar?.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      navigationBar?.trailingAnchor.constraint(equalTo: view.trailingAnchor)
     )
 
     if #available(iOS 11, *) {
-      navigationBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor).isActive = true
+      navigationBar?.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor).isActive = true
     } else {
-      navigationBar.topAnchor.constraint(equalTo: topLayoutGuide.bottomAnchor).isActive = true
+      navigationBar?.topAnchor.constraint(equalTo: topLayoutGuide.bottomAnchor).isActive = true
     }
   }
 }

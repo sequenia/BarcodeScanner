@@ -19,7 +19,6 @@ public final class CameraViewController: UIViewController {
 
   /// Focus view type.
   public var barCodeFocusViewType: FocusViewType = .animated
-  public var initialCameraPosition: AVCaptureDevice.Position = .back
   public var showsCameraButton: Bool = false {
     didSet {
       cameraButton.isHidden = showsCameraButton
@@ -31,14 +30,13 @@ public final class CameraViewController: UIViewController {
   // MARK: - UI proterties
 
   /// Animated focus view.
-  public private(set) lazy var focusView: UIView = self.makeFocusView()
-  /// Button to change torch mode.
-  public private(set) lazy var flashButton: UIButton = .init(type: .custom)
+  public lazy var focusView: UIView? = self.makeFocusView()
   /// Button that opens settings to allow camera usage.
   public private(set) lazy var settingsButton: UIButton = self.makeSettingsButton()
   // Button to switch between front and back camera.
   public private(set) lazy var cameraButton: UIButton = self.makeCameraButton()
-
+    
+  public var configureView: ((CameraViewController) -> ())?
   // Constraints for the focus view when it gets smaller in size.
   private var regularFocusViewConstraints = [NSLayoutConstraint]()
   // Constraints for the focus view when it gets bigger in size.
@@ -67,7 +65,6 @@ public final class CameraViewController: UIViewController {
         captureDevice.unlockForConfiguration()
       } catch {}
 
-      flashButton.setImage(torchMode.image, for: UIControl.State())
     }
   }
 
@@ -99,13 +96,20 @@ public final class CameraViewController: UIViewController {
     }
 
     view.layer.addSublayer(videoPreviewLayer)
-    view.addSubviews(settingsButton, flashButton, focusView, cameraButton)
+    view.addSubviews(settingsButton, focusView ?? UIView(), cameraButton)
+    
+    self.configureView?(self)
 
     torchMode = .off
-    focusView.isHidden = true
+    focusView?.isHidden = true
     setupCamera()
     setupConstraints()
     setupActions()
+    
+    NotificationCenter.default.addObserver(self,
+                                           selector: #selector(self.handleFlashButtonTap),
+                                           name: Notification.Name("sqOnClickLantern"),
+                                           object: nil)
   }
 
   public override func viewDidAppear(_ animated: Bool) {
@@ -135,8 +139,7 @@ public final class CameraViewController: UIViewController {
 
     torchMode = .off
     captureSession.startRunning()
-    focusView.isHidden = false
-    flashButton.isHidden = captureDevice?.position == .front
+    focusView?.isHidden = false
     cameraButton.isHidden = !showsCameraButton
   }
 
@@ -147,19 +150,13 @@ public final class CameraViewController: UIViewController {
 
     torchMode = .off
     captureSession.stopRunning()
-    focusView.isHidden = true
-    flashButton.isHidden = true
+    focusView?.isHidden = true
     cameraButton.isHidden = true
   }
 
   // MARK: - Actions
 
   private func setupActions() {
-    flashButton.addTarget(
-      self,
-      action: #selector(handleFlashButtonTap),
-      for: .touchUpInside
-    )
     settingsButton.addTarget(
       self,
       action: #selector(handleSettingsButtonTap),
@@ -214,7 +211,7 @@ public final class CameraViewController: UIViewController {
       }
 
       if error == nil {
-        strongSelf.setupSessionInput(for: strongSelf.initialCameraPosition)
+        strongSelf.setupSessionInput(for: .back)
         strongSelf.setupSessionOutput()
         strongSelf.delegate?.cameraViewControllerDidSetupCaptureSession(strongSelf)
       } else {
@@ -243,7 +240,6 @@ public final class CameraViewController: UIViewController {
       }
       captureSession.addInput(newInput)
       captureSession.commitConfiguration()
-      flashButton.isHidden = position == .front
     } catch {
       delegate?.cameraViewController(self, didReceiveError: error)
       return
@@ -277,7 +273,7 @@ public final class CameraViewController: UIViewController {
   /// Performs focus view animation.
   private func animateFocusView() {
     // Restore to initial state
-    focusView.layer.removeAllAnimations()
+    focusView?.layer.removeAllAnimations()
     animatedFocusViewConstraints.deactivate()
     regularFocusViewConstraints.activate()
     view.layoutIfNeeded()
@@ -307,14 +303,6 @@ private extension CameraViewController {
   func setupConstraints() {
     if #available(iOS 11.0, *) {
       NSLayoutConstraint.activate(
-        flashButton.topAnchor.constraint(
-          equalTo: view.safeAreaLayoutGuide.topAnchor,
-          constant: 30
-        ),
-        flashButton.trailingAnchor.constraint(
-          equalTo: view.safeAreaLayoutGuide.trailingAnchor,
-          constant: -13
-        ),
         cameraButton.bottomAnchor.constraint(
           equalTo: view.safeAreaLayoutGuide.bottomAnchor,
           constant: -30
@@ -322,8 +310,6 @@ private extension CameraViewController {
       )
     } else {
       NSLayoutConstraint.activate(
-        flashButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 30),
-        flashButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -13),
         cameraButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -30)
       )
     }
@@ -331,8 +317,6 @@ private extension CameraViewController {
     let imageButtonSize: CGFloat = 37
 
     NSLayoutConstraint.activate(
-      flashButton.widthAnchor.constraint(equalToConstant: imageButtonSize),
-      flashButton.heightAnchor.constraint(equalToConstant: imageButtonSize),
 
       settingsButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
       settingsButton.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -340,14 +324,16 @@ private extension CameraViewController {
       settingsButton.heightAnchor.constraint(equalToConstant: 50),
 
       cameraButton.widthAnchor.constraint(equalToConstant: 48),
-      cameraButton.heightAnchor.constraint(equalToConstant: 48),
-      cameraButton.trailingAnchor.constraint(equalTo: flashButton.trailingAnchor)
+      cameraButton.heightAnchor.constraint(equalToConstant: 48)
     )
 
     setupFocusViewConstraints()
   }
 
   func setupFocusViewConstraints() {
+    
+    guard let focusView = self.focusView  else { return }
+    
     NSLayoutConstraint.activate(
       focusView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
       focusView.centerYAnchor.constraint(equalTo: view.centerYAnchor)
