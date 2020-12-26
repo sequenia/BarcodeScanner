@@ -96,6 +96,7 @@ public final class CameraViewController: UIViewController {
     }
 
     view.layer.addSublayer(videoPreviewLayer)
+    videoPreviewLayer.zPosition = 0
     view.addSubviews(settingsButton, focusView ?? UIView(), cameraButton)
     
     self.configureView?(self)
